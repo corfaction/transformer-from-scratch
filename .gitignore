@@ -1,0 +1,4 @@
+.vscode/
+artifacts/
+dataset/
+src/tokenizer/build/
