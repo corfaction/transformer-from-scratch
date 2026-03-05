@@ -5,7 +5,6 @@
 #include <list>
 #include <cstdint>
 #include <fstream>
-#include <chrono>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <json.hpp>
@@ -135,38 +134,92 @@ public:
         }
     }
 
-    void save(std::string path) {
+    // Export tokenizer
+
+    void save(const std::string& path) {
+
         nlohmann::json vocab_json;
-    
+
         for (size_t i = 0; i < id_to_token.size(); i++) {
+
             const std::string& token = id_to_token[i];
-            vocab_json[token_to_utf8(token)] = i;
+
+            std::vector<int> bytes;
+            bytes.reserve(token.size());
+
+            for (unsigned char c : token)
+                bytes.push_back(c);
+
+            vocab_json[std::to_string(i)] = bytes;
         }
-    
+
         std::ofstream file_vocab(path + "/vocab.json");
         file_vocab << vocab_json.dump(2);
         file_vocab.close();
-    
-        std::ofstream file_merges(path + "/merges.txt");
-        for (size_t i = 0; i < merges.size(); i++) {
-            file_merges << token_to_utf8(id_to_token[merges[i].first]) << " " 
-                    << token_to_utf8(id_to_token[merges[i].second]) << std::endl;
-        }
-        file_merges.close();
-}
 
-    std::string token_to_utf8(const std::string& token) {
-        std::string result;
-        for (unsigned char c : token) {
-            if (c < 128) {
-                result += static_cast<char>(c);
-            } else {
-                char buf[8];
-                snprintf(buf, sizeof(buf), "<0x%02X>", static_cast<int>(c));
-                result += buf;
-            }
+
+        std::ofstream file_merges(path + "/merges.txt");
+
+        for (auto &p : merges) {
+            file_merges << p.first << "," << p.second << "\n";
         }
-        return result;
+
+        file_merges.close();
+    }
+
+    // import tokenizer
+
+    void load(const std::string& path) {
+
+        vocab.clear();
+        id_to_token.clear();
+        merges.clear();
+
+        std::ifstream vocab_file(path + "/vocab.json");
+
+        nlohmann::json vocab_json;
+        vocab_file >> vocab_json;
+
+        size_t vocab_size = vocab_json.size();
+
+        id_to_token.resize(vocab_size);
+        vocab.reserve(vocab_size);
+
+        for (auto& [id_str, byte_array] : vocab_json.items()) {
+
+            int id = std::stoi(id_str);
+
+            std::string token;
+            token.reserve(byte_array.size());
+
+            for (auto& b : byte_array)
+                token.push_back(static_cast<char>(b.get<int>()));
+
+            vocab[token] = id;
+            id_to_token[id] = token;
+        }
+
+        vocab_file.close();
+
+        std::ifstream merges_file(path + "/merges.txt");
+
+        std::string line;
+
+        while (std::getline(merges_file, line)) {
+
+            if (line.empty() || line[0] == '#')
+                continue;
+
+            std::istringstream iss(line);
+
+            int a, b;
+            char comma;
+
+            if (iss >> a >> comma >> b)
+                merges.push_back({a, b});
+        }
+
+        merges_file.close();
     }
 };
 
@@ -174,5 +227,6 @@ PYBIND11_MODULE(tokenizer, m) {
     py::class_<Tokenizer>(m, "Tokenizer")
         .def(py::init<>())
         .def("train", &Tokenizer::train)
-        .def("save", &Tokenizer::save);
+        .def("save", &Tokenizer::save)
+        .def("load", &Tokenizer::load);
 }
