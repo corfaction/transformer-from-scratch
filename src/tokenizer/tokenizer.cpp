@@ -20,7 +20,6 @@ struct PairHash {
 
 class Tokenizer {
 private:
-    std::list<int> tokens;
     std::unordered_map<std::string, int> vocab;
     std::vector<std::pair<int, int>> merges;
     std::unordered_map<std::pair<int, int>, int, PairHash> pair_freq;
@@ -57,6 +56,7 @@ public:
         // text to bytes conversion
 
         std::vector<uint8_t> bytes(content.begin(), content.end());
+        std::list<int> tokens;
 
         // bytes to token conversion
         
@@ -134,6 +134,44 @@ public:
         }
     }
 
+    std::vector<int> encode(std::string& text) {
+        std::list<int> tokens;
+        std::vector<uint8_t> bytes(text.begin(), text.end());
+
+        for(int b = 0; b < bytes.size(); ++b) {
+            tokens.push_back(vocab.at(std::string(1, bytes[b])));
+        }
+
+        for(auto i = 0; i < merges.size(); ++i) {
+            auto tokens_it = tokens.begin();
+            while(tokens_it != tokens.end() && std::next(tokens_it) != tokens.end()) {
+                if(*tokens_it == merges[i].first && *std::next(tokens_it) == merges[i].second) {
+                    auto new_token = vocab[id_to_token[*tokens_it] + id_to_token[*std::next(tokens_it)]];
+                    *tokens_it = new_token;
+                    tokens_it = tokens.erase(std::next(tokens_it));
+                } else {
+                    ++tokens_it;
+                }
+            } 
+        }
+
+        std::vector<int> output;
+
+        for(auto tokens_it = tokens.begin(); tokens_it != tokens.end(); ++tokens_it) {
+            output.push_back(*tokens_it);
+        }
+
+        return output;
+    }
+
+    std::string decode(std::vector<int> tokens) {
+        std::string text;
+        for(auto i : tokens) {
+            text += id_to_token[i];
+        }
+        return text;
+    }
+
     // Export tokenizer
 
     void save(const std::string& path) {
@@ -160,7 +198,7 @@ public:
 
         std::ofstream file_merges(path + "/merges.txt");
 
-        for (auto &p : merges) {
+        for (auto p : merges) {
             file_merges << p.first << "," << p.second << "\n";
         }
 
@@ -228,5 +266,7 @@ PYBIND11_MODULE(tokenizer, m) {
         .def(py::init<>())
         .def("train", &Tokenizer::train)
         .def("save", &Tokenizer::save)
-        .def("load", &Tokenizer::load);
+        .def("load", &Tokenizer::load)
+        .def("encode", &Tokenizer::encode)
+        .def("decode", &Tokenizer::decode);
 }
