@@ -259,6 +259,9 @@ public:
 
         merges_file.close();
     }
+    int getVocabSize() {
+        return vocab.size();
+    }
 };
 
 PYBIND11_MODULE(tokenizer, m) {
@@ -268,5 +271,6 @@ PYBIND11_MODULE(tokenizer, m) {
         .def("save", &Tokenizer::save)
         .def("load", &Tokenizer::load)
         .def("encode", &Tokenizer::encode)
-        .def("decode", &Tokenizer::decode);
+        .def("decode", &Tokenizer::decode)
+        .def("getVocabSize", &Tokenizer::getVocabSize);
 }

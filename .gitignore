@@ -3,3 +3,4 @@ artifacts/
 dataset/
 src/tokenizer/build/
 commit.txt
+cpp_module/
