@@ -1,6 +1,10 @@
 .vscode/
+src/transformer/__pycache__/
+
 artifacts/
 dataset/
+
 src/tokenizer/build/
-commit.txt
 cpp_module/
+
+commit.txt
